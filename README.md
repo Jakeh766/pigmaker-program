@@ -1,4 +1,4 @@
-## How to use Pigmaker Program
+## Pigmaker Program
 
 This program takes scanned images of breeding and farrowing records that resemble the following examples and generates reports.
 
