@@ -38,8 +38,7 @@ def extract_data(input_document):
     """Converts the pdf to a png and then to a pandas dataframe using AWS textract"""
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        pages = convert_from_path(input_document, output_folder=temp_dir,
-                                  poppler_path=r"poppler-0.68.0_x86\poppler-0.68.0\bin")
+        pages = convert_from_path(input_document, output_folder=temp_dir)
         dfs = list()
         client = boto3.client("textract", config=Config(connect_timeout=6000))
         for i, page in enumerate(pages):
@@ -53,28 +52,6 @@ def extract_data(input_document):
             print("Page"+str(i+1)+"done")
 
     return pd.concat(dfs)
-
-
-# def extract_data2(input_document):
-#     pages = convert_from_path(input_document,
-#                               poppler_path=r"C:\Users\jakeh\poppler-0.68.0_x86\poppler-0.68.0\bin")
-#     dfs = pd.DataFrame()
-#     for i, page in enumerate(pages):
-#         page.save("out" + str(i) + ".png", "PNG")
-#         print(pytesseract.image_to_data(Image.open('out' + str(i) + ".png"), output_type='data.frame').to_string())
-#
-#     return dfs
-#
-#
-# def extract_data3(input_document):
-#     pdf = PDF(src=input_document)
-#
-#     ocr = TesseractOCR(lang="eng")
-#
-#     pdf_tables = pdf.extract_tables(ocr=ocr)
-#     for i in pdf_tables:
-#         print(i.to_string())
-
 
 def general_clean(df1):
     """Performs data cleaning that is common to both breeding and farrowing"""
@@ -295,10 +272,12 @@ def farrow_produce_errors(df1, start_end_dates):
 
     dates_cols_list = ["Date F", "Date W"]
     numeric_cols_list = ["Crate#", "P", "#L", "#S", "#M", "#W"]
-    error_dict = {"\\": "1", "I": "1", "o": "0", "O": "0", "&": "9", "a": "9", "/": "1","L":"1","l":"1","i":"1","(":"1",")":"1"}
+    error_dict = {"\\": "1", "I": "1", "o": "0", "O": "0", "&": "9", "a": "9", "/": "1","L":"1","l":"1","i":"1","(":"1",")":"1","-":np.NaN,"":np.NaN}
     df1[numeric_cols_list] = df1[numeric_cols_list].replace(error_dict)
+    df1["Crate#"] = df1["Crate#"].str.lstrip('0').str.replace("-","")
     error_list = []
     for i in range(1, 5):
+        df1["C" + str(i)] = df1["C" + str(i)].str.replace(".","-").str.replace("/","-")
         for count, x in enumerate(df1["C" + str(i)]):
             is_num_deaths = True
             num_deaths = []
@@ -429,7 +408,7 @@ def generate_report(df3, group_num, total_weaned):
     diff2 = total_weaned - df3["#W"].sum()
     diff3 = diff - total_weaned
     df3 = pd.concat(
-        [df3, pd.DataFrame([{"Sow ID": "Y", "Unknown": diff3, "#W":diff2, "Group Number": group_num}])],
+        [df3, pd.DataFrame([{"Sow ID": "Y", "Unknown": diff3, "#W":diff2, "Group Number": int(group_num)}])],
         ignore_index=True)
 
     # print(df3["#L"].sum()-df3["#W"].sum())

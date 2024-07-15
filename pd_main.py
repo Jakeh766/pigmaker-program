@@ -65,7 +65,7 @@ def are_dates_valid(start_end_dates):
     return True
 def add_to_master():
 
-    group_num = group_entry.get()
+    # group_num = group_entry.get()
 
     #If error exists, stop here
     isOK = error_checks()
@@ -79,9 +79,8 @@ def add_to_master():
         return
     
     print('Updating Master Spreadsheet...................')
-    #JAKE: ADD MASTER FUNCTION
-    print('Master Spreadsheet Update Complete.')
     be.output_to_excel(merged_df)
+    print('Master Spreadsheet Update Complete.')
 def review_table(df, df_errors, filepath, table_name, pdf_to_df_function, df_error_function, start_end_dates, group_num):
     """
     Generic function to display dataframes in an editable table.
