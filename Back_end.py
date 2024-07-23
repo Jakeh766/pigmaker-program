@@ -23,15 +23,16 @@ for key in [10, 12, 28]:
     CODE_DICT[key] = "Laid On"
 for key in [23, 30]:
     CODE_DICT[key] = "Strep"
-for key in [2, 3, 7, 9, 15, 25, 31]:
+for key in [2, 3, 7, 9, 15, 25, 31, 29]:
     CODE_DICT[key] = "Other"
 
 DOWNLOADS_DIRECTORY = os.path.expanduser(r"~\\Downloads")
-RAW_RECORDS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY,"PigmakerProgram","Raw_Records")
-BREEDING_FARROWING_RECORDS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram", "Breeding_Farrowing_Records")
+RAW_RECORDS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram", "Raw_Records")
+BREEDING_FARROWING_RECORDS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram",
+                                                    "Breeding_Farrowing_Records")
 GROUP_RECORDS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram", "Group_Records")
-REPORTS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY,"PigmakerProgram","Reports")
-MASTER_DATABASE = os.path.join(DOWNLOADS_DIRECTORY,"PigmakerProgram","PigmakerDB.xlsx")
+REPORTS_DIRECTORY = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram", "Reports")
+MASTER_DATABASE = os.path.join(DOWNLOADS_DIRECTORY, "PigmakerProgram", "PigmakerDB.xlsx")
 
 
 def extract_data(input_document):
@@ -49,9 +50,10 @@ def extract_data(input_document):
                                  boto3_textract_client=client)
             tdoc = Document(resp)
             dfs.append(pd.DataFrame(convert_table_to_list(trp_table=tdoc.pages[0].tables[0])))
-            print("Page"+str(i+1)+"done")
+            print("Page" + str(i + 1) + "done")
 
     return pd.concat(dfs)
+
 
 def general_clean(df1):
     """Performs data cleaning that is common to both breeding and farrowing"""
@@ -70,7 +72,7 @@ def general_clean(df1):
     df1.drop(df1[df1['Sow ID'] == 'Sow ID'].index, inplace=True)
     df1.replace('', np.NaN, inplace=True)
     # df1.reset_index(drop=True, inplace=True)
-    df1 = df1.applymap(lambda x: x.replace(" ","") if type(x) == str else x)
+    df1 = df1.applymap(lambda x: x.replace(" ", "") if type(x) == str else x)
     df1.drop(df1[df1['Sow ID'] == 'SowID'].index, inplace=True)
     df1.reset_index(drop=True, inplace=True)
     df1 = df1.dropna(subset=["Sow ID"])
@@ -176,7 +178,7 @@ def produce_date_errors(df, cols_list, start_end_dates):
                 if pd.notna(value):
                     if "/" in str(value):
                         value = str(value).partition("/")[2]
-                        df.at[i,x] = value
+                        df.at[i, x] = value
                     if len(value) <= 2:
                         if not int(value) in possible_days:
                             dates_error_list.append([i, df.columns.get_loc(x)])
@@ -205,24 +207,24 @@ def produce_date_errors(df, cols_list, start_end_dates):
     return dates_error_list
 
 
-def fill_table(df1):
+def fill_table(df1, type):
     """Autofills the Date Weaned and Breeder columns"""
+    if type == 'Farrow':
+        for i in range(0, len(df1)):
+            if pd.isna(df1.at[i, "Date W"]) and pd.notna(df1.at[i, "Date F"]):
+                df1.at[i, "Date W"] = df1.at[i - 1, "Date W"]
 
-    for i in range(0, len(df1)):
-        if pd.isna(df1.at[i, "Date W"]) and pd.notna(df1.at[i, "Date F"]):
-            df1.at[i, "Date W"] = df1.at[i - 1, "Date W"]
+            if pd.isna(df1.at[i, "Crate#"]) and pd.notna(df1.at[i, "Date F"]):
+                df1.at[i, "Crate#"] = df1.at[i - 1, "Crate#"] + 1
+    elif type == 'Breed':
+        for i in range(0, len(df1)):
+            for count in range(1, 4):
+                for x in range(0, len(df1)):
+                    if pd.isna(df1.at[x, "Breeder" + str(count)]) and pd.notna(df1.at[x, "HC" + str(count)]):
+                        df1.at[x, "Breeder" + str(count)] = df1.at[x, "HC" + str(count)]
 
-        if pd.isna(df1.at[i,"Crate#"]) and pd.notna(df1.at[i,"Date F"]):
-            df1.at[i,"Crate#"] = df1.at[i-1,"Crate#"] + 1
-
-        for count in range(1, 4):
-            for x in range(0, len(df1)):
-                if pd.isna(df1.at[x, "Breeder" + str(count)]) and pd.notna(df1.at[x, "HC" + str(count)]):
-                    df1.at[x, "Breeder" + str(count)] = df1.at[x, "HC" + str(count)]
-
-        if i != 0 and pd.isna(df1.at[i,"LW"]):
-            df1.at[i,"LW"] = df1.at[i-1,"LW"]
-
+            if i != 0 and pd.isna(df1.at[i, "LW"]):
+                df1.at[i, "LW"] = df1.at[i - 1, "LW"]
 
     # Waiting to get more info
 
@@ -234,9 +236,9 @@ def breed_produce_errors(df1, start_end_dates):
 
     df1.replace({"NOT_SELECTED,": np.NaN}, inplace=True)
 
-    dates_cols_list = ["Date Bred1", "Date Bred2", "Date Bred3","LW"]
+    dates_cols_list = ["Date Bred1", "Date Bred2", "Date Bred3", "LW"]
     breeder_hc_cols = ["HC1", "Breeder1", "HC2", "Breeder2", "HC3", "Breeder3"]
-    breeder_list = ["BV", "AC", "CJ", "HR", "JS", "J", "NS","GH","TW"]
+    breeder_list = ["BV", "AC", "CJ", "HR", "JS", "J", "NS", "GH", "TW"]
     df1[breeder_hc_cols] = df1[breeder_hc_cols].applymap(lambda x: x.upper() if isinstance(x, str) else x)
 
     with open("breeders.pkl", 'rb') as file:
@@ -247,11 +249,13 @@ def breed_produce_errors(df1, start_end_dates):
         first_initial = breeder[0]
         breeders_replace_dict[first_initial] = breeder
 
-    breeders_replace_dict.update({"AL":"AC","BL":"BV","PV":"BV","P":"BV","8":"BV","LT":"HR","3":"BV","IT":"HR","F":"BV",
-                                  "3V":"BV","BU":"BV","BR":"BV","4C":"AC","4":"AC","IS":"BV","13":"BV","R":"BV","5":"BV"})
+    breeders_replace_dict.update(
+        {"AL": "AC", "BL": "BV", "PV": "BV", "P": "BV", "8": "BV", "LT": "HR", "3": "BV", "IT": "HR", "F": "BV",
+         "3V": "BV", "BU": "BV", "BR": "BV", "4C": "AC", "4": "AC", "IS": "BV", "13": "BV", "R": "BV", "5": "BV"})
     df1[breeder_hc_cols] = df1[breeder_hc_cols].replace(breeders_replace_dict)
     df1[dates_cols_list] = df1[dates_cols_list].replace(
-        {"1b": "16", "1>": "17", "lb": "16", "1)": "17", "lt": "16", "It": "16",'\\': "1","/":"1","l":"1","I":"1"})
+        {"1b": "16", "1>": "17", "lb": "16", "1)": "17", "lt": "16", "It": "16", '\\': "1", "/": "1", "l": "1",
+         "I": "1"})
 
     error_list = []
 
@@ -263,7 +267,6 @@ def breed_produce_errors(df1, start_end_dates):
     error_list.extend(produce_date_errors(df1, dates_cols_list, start_end_dates))
     error_list.extend(produce_sow_id_errors(df1))
 
-
     return error_list
 
 
@@ -272,12 +275,13 @@ def farrow_produce_errors(df1, start_end_dates):
 
     dates_cols_list = ["Date F", "Date W"]
     numeric_cols_list = ["Crate#", "P", "#L", "#S", "#M", "#W"]
-    error_dict = {"\\": "1", "I": "1", "o": "0", "O": "0", "&": "9", "a": "9", "/": "1","L":"1","l":"1","i":"1","(":"1",")":"1","-":np.NaN,"":np.NaN}
+    error_dict = {"\\": "1", "I": "1", "o": "0", "O": "0", "&": "9", "a": "9", "/": "1", "L": "1", "l": "1", "i": "1",
+                  "(": "1", ")": "1", "-": np.NaN, "ll": "11"}
     df1[numeric_cols_list] = df1[numeric_cols_list].replace(error_dict)
-    df1["Crate#"] = df1["Crate#"].str.lstrip('0').str.replace("-","")
+    df1["Crate#"] = df1["Crate#"].str.lstrip('0').str.replace("-", "")
     error_list = []
     for i in range(1, 5):
-        df1["C" + str(i)] = df1["C" + str(i)].str.replace(".","-").str.replace("/","-")
+        df1["C" + str(i)] = df1["C" + str(i)].str.replace(".", "-").str.replace("/", "-")
         for count, x in enumerate(df1["C" + str(i)]):
             is_num_deaths = True
             num_deaths = []
@@ -305,7 +309,6 @@ def farrow_produce_errors(df1, start_end_dates):
     error_list.extend(produce_numeric_errors(df1, numeric_cols_list))
     error_list.extend(produce_sow_id_errors(df1))
 
-
     return error_list
 
 
@@ -325,10 +328,11 @@ def pdf_to_breed(filepath, group_num):
     """Takes a pdf of breeding information and converts to a dataframe"""
 
     df = extract_data(filepath)
-    raw_record_path = os.path.join(RAW_RECORDS_DIRECTORY,"raw_breeding"+str(group_num)+".pkl")
+    raw_record_path = os.path.join(RAW_RECORDS_DIRECTORY, "raw_breeding" + str(group_num) + ".pkl")
     df.to_pickle(raw_record_path)
     df = general_clean(df)
-
+    df.columns = ["Sow ID", "LW", "Date Bred1", "HC1", "Breeder1", "Date Bred2", "HC2", "Breeder2", "Date Bred3", "HC3",
+                  "Breeder3"]
     return df
 
 
@@ -336,15 +340,18 @@ def pdf_to_farrow(filepath, group_num):
     """Takes a pdf of farrowing information and converts to a dataframe"""
 
     df = extract_data(filepath)
-    raw_record_path = os.path.join(RAW_RECORDS_DIRECTORY,"raw_farrowing"+str(group_num)+".pkl")
+    raw_record_path = os.path.join(RAW_RECORDS_DIRECTORY, "raw_farrowing" + str(group_num) + ".pkl")
     df.to_pickle(raw_record_path)
     df = general_clean(df)
+    df.columns = ["Crate#", "Sow ID", "P", "Date F", "#L", "#S", "#M", "#W", "Date W", "C1", "C2", "C3", "C4"]
 
     return df
 
 
-def pre_report_processing(df1, df2, start_end_dates, group_num):
+def pre_report_processing(breed_df, farrow_df, start_end_dates, group_num):
     """ Converts columns to their correct data type and merges the farrow and breed dataframes on Sow ID"""
+    df1 = breed_df.copy()
+    df2 = farrow_df.copy()
 
     df1 = convert_to_date(df1, ["Date Bred1", "Date Bred2", "Date Bred3", "LW"], start_end_dates)
     df2 = convert_to_date(df2, ["Date F", "Date W"], start_end_dates)
@@ -380,11 +387,11 @@ def pre_report_processing(df1, df2, start_end_dates, group_num):
                 df2.at[count, CODE_DICT[int(code)]] += int(deaths)
         df2.drop("C" + str(i), axis=1, inplace=True)
 
-    df2[["#L", "#S", "#M", "#W","P"]] = df2[["#L", "#S", "#M", "#W","P"]].replace(np.NaN, 0)
+    df2[["#L", "#S", "#M", "#W", "P"]] = df2[["#L", "#S", "#M", "#W", "P"]].replace(np.NaN, 0)
 
-
+    df2 = fill_table(df2, type="Farrow")
+    df1 = fill_table(df1, type="Breed")
     df3 = df2.merge(df1, how='outer', on="Sow ID")
-    df3 = fill_table(df3)
     df3["Group Number"] = int(group_num)
 
     return df3
@@ -404,11 +411,10 @@ def generate_report(df3, group_num, total_weaned):
     print(diff)
     print(df3["#L"].sum())
 
-
     diff2 = total_weaned - df3["#W"].sum()
     diff3 = diff - total_weaned
     df3 = pd.concat(
-        [df3, pd.DataFrame([{"Sow ID": "Y", "Unknown": diff3, "#W":diff2, "Group Number": int(group_num)}])],
+        [df3, pd.DataFrame([{"Sow ID": "Y", "Unknown": diff3, "#W": diff2, "Group Number": int(group_num)}])],
         ignore_index=True)
 
     # print(df3["#L"].sum()-df3["#W"].sum())
@@ -549,13 +555,13 @@ def generate_report(df3, group_num, total_weaned):
     weaned_pigs = df3["#W"].sum()
     pdf.cell(0, 10, "*The total number of weaned pigs is " + str(weaned_pigs), 0, 1, 'L')
 
-    pdf.multi_cell(0,10, "*" + str(diff2) + " weaned pigs were added to sow 'Y'",0, 'L')
+    pdf.multi_cell(0, 10, "*" + str(diff2) + " weaned pigs were added to sow 'Y'", 0, 'L')
 
     pdf.multi_cell(0, 10, "*" + str(diff3) +
-                       " unknown deaths were added to imaginary sow 'Y' to make the total born live minus the total dead equal the total weaned",
-                       0, 'L')
+                   " unknown deaths were added to imaginary sow 'Y' to make the total born live minus the total dead equal the total weaned",
+                   0, 'L')
 
-    pdf.set_y(pdf.get_y()+5)
+    pdf.set_y(pdf.get_y() + 5)
 
     heat_checker_combos = generate_combos(["HC1", "HC2", "HC3"])
 
@@ -613,7 +619,7 @@ def generate_report(df3, group_num, total_weaned):
     pdf.set_y(pdf.get_y() + 10)
 
     make_table_by_individual(breeder_combos, "breeder")
-    full_report_path = os.path.join(REPORTS_DIRECTORY,"Group"+group_num+" Report.pdf")
+    full_report_path = os.path.join(REPORTS_DIRECTORY, "Group" + group_num + " Report.pdf")
     pdf.output(full_report_path)
     print("Report has been created")
 
